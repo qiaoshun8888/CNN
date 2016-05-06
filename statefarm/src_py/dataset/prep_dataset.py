@@ -7,13 +7,13 @@ import pickle
 import random
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 
 from tqdm import tqdm
 
 from sklearn.preprocessing import OneHotEncoder
 from skimage.io import imread, imsave
 from scipy.misc import imresize
+import tensorflow as tf
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
