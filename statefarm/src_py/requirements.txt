@@ -1,0 +1,6 @@
+scikit-learn
+scipy
+pandas
+tqdm
+scikit-image
+keras
