@@ -8,6 +8,7 @@
 *.t7
 *.jpg
 *.pkl
+*.pb
 statefarm/src_py/checkpoints/*
 statefarm/src_py/summaries/*
 

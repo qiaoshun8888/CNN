@@ -17,7 +17,7 @@ DOWNSAMPLE = 20
 WIDTH, HEIGHT, NUM_CHANNELS = 640 // DOWNSAMPLE, 480 // DOWNSAMPLE, 3
 NUM_CLASSES = 10
 
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 5e-3
 
 class Model:
     def __init__(self, layers, fold_index, batch_size):
