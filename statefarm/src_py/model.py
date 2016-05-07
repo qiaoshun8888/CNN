@@ -27,7 +27,7 @@ class Model:
 
         checkpoint_path = os.path.join(CHECKPOINT_PATH, 'model_{}'.format(self.fold_index))
         mkdirp(checkpoint_path)
-	self.checkpoint_dest = os.path.join(checkpoint_path, 'checkpoint')
+        self.checkpoint_dest = os.path.join(checkpoint_path, 'checkpoint')
 
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
         global_step_op = self.global_step.assign_add(1)
