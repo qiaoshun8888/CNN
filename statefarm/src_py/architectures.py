@@ -24,9 +24,9 @@ def vgg_bn():
 
         MaxPool([1, 3, 3, 1], [1, 2, 2, 1]),
 
-        Conv2D([1, 1], 128, [1, 1, 1, 1]),
-        Conv2DBatchNorm(128),
-        Activation(tf.nn.relu),
+        # Conv2D([1, 1], 128, [1, 1, 1, 1]),
+        # Conv2DBatchNorm(128),
+        # Activation(tf.nn.relu),
 
         # Conv2D([3, 3], 128, [1, 1, 1, 1], padding='SAME'),
         # Conv2DBatchNorm(128),
@@ -34,7 +34,7 @@ def vgg_bn():
 
         Flatten(),
 
-        Dense(128),
+        Dense(64),
         Activation(tf.sigmoid),
 
         Dropout(0.5),
