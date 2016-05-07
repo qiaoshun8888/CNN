@@ -18,13 +18,13 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_boolean('test', False, 'If true, test locally.')
 
-DATASET_PATH = os.environ.get('DATASET_PATH', 'dataset/data_20.pkl' if not FLAGS.test else 'dataset/data_20_subset.pkl')
+DATASET_PATH = os.environ.get('DATASET_PATH', 'dataset/data_20_tf.pkl' if not FLAGS.test else 'dataset/data_20_subset_tf.pkl')
 CHECKPOINT_PATH = os.environ.get('CHECKPOINT_PATH', 'checkpoints/')
 SUMMARY_PATH = os.environ.get('SUMMARY_PATH', 'summaries/')
 
 NUM_EPOCHS = 50 if not FLAGS.test else 2
 MAX_FOLDS = 8
-BATCH_SIZE = 128
+BATCH_SIZE = 256
 
 print('Loading dataset {}...'.format(DATASET_PATH))
 with open(DATASET_PATH, 'rb') as f:

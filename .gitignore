@@ -9,8 +9,10 @@
 *.jpg
 *.pkl
 *.pb
+*.h5
 statefarm/src_py/checkpoints/*
 statefarm/src_py/summaries/*
+statefarm/src_py/models/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

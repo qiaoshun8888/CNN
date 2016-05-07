@@ -13,20 +13,17 @@ from tqdm import tqdm
 from sklearn.preprocessing import OneHotEncoder
 from skimage.io import imread, imsave
 from scipy.misc import imresize
-import tensorflow as tf
 
-flags = tf.app.flags
-FLAGS = flags.FLAGS
-
-flags.DEFINE_boolean('subset', False, 'If true, build a subset.')
-flags.DEFINE_integer('downsample', 20, 'Downsample factor.')
-
-WIDTH, HEIGHT = 640 // FLAGS.downsample, 480 // FLAGS.downsample
-# WIDTH, HEIGHT = 224, 224
+SUBSET = False
+DOWNSAMPLE = 20
 NUM_CLASSES = 10
 
+WIDTH, HEIGHT = 640 // DOWNSAMPLE, 480 // DOWNSAMPLE
+
 def load_image(path):
-    return imresize(imread(path), (HEIGHT, WIDTH))
+    img = imread(path)
+    img = imresize(img, (HEIGHT, WIDTH))
+    return img
 
 def load_train(base):
     driver_imgs_list = pd.read_csv('driver_imgs_list.csv')
@@ -42,7 +39,7 @@ def load_train(base):
         driver_ids_group = driver_imgs_grouped.get_group('c{}'.format(j))
         paths = os.path.join(base, 'c{}/'.format(j)) + driver_ids_group.img
 
-        if FLAGS.subset:
+        if SUBSET:
             paths = paths[:100]
             driver_ids_group = driver_ids_group.iloc[:100]
 
@@ -52,6 +49,7 @@ def load_train(base):
             img = load_image(path)
             if i == 0:
                 imsave('c{}.jpg'.format(j), img)
+            img = img.swapaxes(2, 0)
 
             X_train.append(img)
             y_train.append(j)
@@ -68,18 +66,19 @@ def load_train(base):
 def load_test(base):
     X_test = []
     X_test_id = []
-    paths = glob.glob('{}*.jpg'.format(base))
+    paths = glob.glob(os.path.join(base, '*.jpg'))
 
-    if FLAGS.subset:
+    if SUBSET:
         paths = paths[:100]
 
     print('Reading test images...')
     for i, path in tqdm(enumerate(paths), total=len(paths)):
-        id = os.path.basename(path)
+        img_id = os.path.basename(path)
         img = load_image(path)
+        img = img.swapaxes(2, 0)
 
         X_test.append(img)
-        X_test_id.append(id)
+        X_test_id.append(img_id)
 
     X_test = np.array(X_test)
     X_test_id = np.array(X_test_id)
@@ -89,10 +88,10 @@ def load_test(base):
 X_train, y_train, driver_ids = load_train('imgs/train/')
 X_test, X_test_ids = load_test('imgs/test/')
 
-if FLAGS.subset:
-    dest = 'data_{}_subset_tf.pkl'.format(FLAGS.downsample)
+if SUBSET:
+    dest = 'data_{}_subset_keras.pkl'.format(DOWNSAMPLE)
 else:
-    dest = 'data_{}_tf.pkl'.format(FLAGS.downsample)
+    dest = 'data_{}_keras.pkl'.format(DOWNSAMPLE)
 
 with open(dest, 'wb') as f:
     pickle.dump((X_train, y_train, X_test, X_test_ids, driver_ids), f)

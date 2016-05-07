@@ -34,7 +34,7 @@ def vgg_bn():
 
         Flatten(),
 
-        Dense(128),
+        Dense(64),
         Activation(tf.sigmoid),
 
         Dropout(0.5),
