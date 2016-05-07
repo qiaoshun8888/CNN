@@ -30,7 +30,7 @@ mkdirp(CHECKPOINT_PATH)
 mkdirp(SUMMARY_PATH)
 mkdirp(MODEL_PATH)
 
-NB_EPOCHS = 20 if not TESTING else 10
+NB_EPOCHS = 50 if not TESTING else 10
 MAX_FOLDS = 8 if not TESTING else 3
 DOWNSAMPLE = 20
 
@@ -111,8 +111,8 @@ for train_index, valid_index in LabelShuffleSplit(driver_indices, n_iter=MAX_FOL
     mkdirp(summary_path)
 
     callbacks = [
-        EarlyStopping(monitor='val_loss', patience=2, verbose=0, mode='auto'),
-        ModelCheckpoint(checkpoint_path, monitor='val_loss', verbose=0, save_best_only=True, mode='auto'),
+        EarlyStopping(monitor='val_loss', patience=2, verbose=1, mode='auto'),
+        ModelCheckpoint(checkpoint_path, monitor='val_loss', verbose=1, save_best_only=True, mode='auto'),
         TensorBoard(log_dir=summary_path, histogram_freq=0)
     ]
     model.fit(X_train, y_train, \
