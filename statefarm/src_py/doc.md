@@ -33,3 +33,4 @@ should be replaced with some other function. It would be good if someone propose
 Running "as is" from repository will generate submission with validation loss around 0.27 and LB score ~1.03. I was able to generate solutions with 0.85-0.9 score with same code on different parameters. But I wasn't experimented much.
 Discussion Link: https://www.kaggle.com/c/state-farm-distracted-driver-detection/forums/t/19971/simple-solution-keras
 
+
