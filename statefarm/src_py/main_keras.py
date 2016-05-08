@@ -20,7 +20,11 @@ from utilities import write_submission, calc_geom, calc_geom_arr, mkdirp
 
 TESTING = True
 
-DATASET_PATH = os.environ.get('DATASET_PATH', 'dataset/data_20_keras.pkl' if not TESTING else 'dataset/data_20_subset_keras.pkl')
+DOWNSAMPLE = 20
+NB_EPOCHS = 50 if not TESTING else 10
+MAX_FOLDS = 8 if not TESTING else 2
+
+DATASET_PATH = os.environ.get('DATASET_PATH', 'dataset/data_%d_keras.pkl' % DOWNSAMPLE if not TESTING else 'dataset/data_%d_subset_keras.pkl' % DOWNSAMPLE)
 
 CHECKPOINT_PATH = os.environ.get('CHECKPOINT_PATH', 'checkpoints/')
 SUMMARY_PATH = os.environ.get('SUMMARY_PATH', 'summaries/')
@@ -30,12 +34,8 @@ mkdirp(CHECKPOINT_PATH)
 mkdirp(SUMMARY_PATH)
 mkdirp(MODEL_PATH)
 
-NB_EPOCHS = 50 if not TESTING else 10
-MAX_FOLDS = 8 if not TESTING else 3
-DOWNSAMPLE = 20
-
 WIDTH, HEIGHT, NB_CHANNELS = 640 // DOWNSAMPLE, 480 // DOWNSAMPLE, 3
-BATCH_SIZE = 256
+BATCH_SIZE = 64
 
 with open(DATASET_PATH, 'rb') as f:
     X_train_raw, y_train_raw, X_test, X_test_ids, driver_ids = pickle.load(f)
@@ -50,35 +50,52 @@ def vgg_bn():
     model.add(Convolution2D(32, 3, 3, border_mode='same', init='he_normal', input_shape=(NB_CHANNELS, WIDTH, HEIGHT)))
     model.add(BatchNormalization())
     model.add(Activation('relu'))
-    model.add(Convolution2D(32, 3, 3, border_mode='same', init='he_normal'))
-    model.add(BatchNormalization())
-    model.add(Activation('relu'))
+    # model.add(Convolution2D(32, 3, 3, border_mode='same', init='he_normal'))
+    # model.add(BatchNormalization())
+    # model.add(Activation('relu'))
 
-    model.add(MaxPooling2D((3, 3), strides=(2, 2)))
-
-    model.add(Convolution2D(64, 3, 3, subsample=(2, 2), init='he_normal'))
-    model.add(BatchNormalization())
-    model.add(Activation('relu'))
     model.add(Convolution2D(64, 3, 3, border_mode='same', init='he_normal'))
     model.add(BatchNormalization())
     model.add(Activation('relu'))
-
-    model.add(MaxPooling2D((2, 2), strides=(1, 1)))
-
-    # model.add(Convolution2D(128, 3, 3, subsample=(2, 2), init='he_normal'))
+    # model.add(Convolution2D(64, 3, 3, border_mode='same', init='he_normal'))
     # model.add(BatchNormalization())
     # model.add(Activation('relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    # model.add(Convolution2D(128, 2, 2, subsample=(2, 2), init='he_normal'))
+    model.add(Convolution2D(128, 3, 3, border_mode='same', init='he_normal'))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
     # model.add(Convolution2D(128, 3, 3, border_mode='same', init='he_normal'))
     # model.add(BatchNormalization())
     # model.add(Activation('relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    # model.add(Convolution2D(256, 3, 3, border_mode='same', init='he_normal'))
+    # model.add(BatchNormalization())
+    # model.add(Activation('relu'))
+    # model.add(Convolution2D(256, 3, 3, border_mode='same', init='he_normal'))
+    # model.add(BatchNormalization())
+    # model.add(Activation('relu'))
+    # model.add(Convolution2D(256, 3, 3, border_mode='same', init='he_normal'))
+    # model.add(BatchNormalization())
+    # model.add(Activation('relu'))
+    # model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
     model.add(Flatten())
+
     model.add(Dense(128, activation='sigmoid', init='he_normal'))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+
+    model.add(Dense(128, activation='sigmoid', init='he_normal'))
+    model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
     model.add(Dense(10, activation='softmax', init='he_normal'))
+
     # model.compile(Adam(lr=1e-3), loss='categorical_crossentropy', metrics=['accuracy'])
-    sgd = SGD(lr=1e-3, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = SGD(lr=5e-3, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
 
     return model
@@ -112,7 +129,7 @@ for train_index, valid_index in LabelShuffleSplit(driver_indices, n_iter=MAX_FOL
 
     callbacks = [
         EarlyStopping(monitor='val_loss', patience=2, verbose=1, mode='auto'),
-        ModelCheckpoint(checkpoint_path, monitor='val_loss', verbose=1, save_best_only=True, mode='auto'),
+        ModelCheckpoint(checkpoint_path, monitor='val_loss', verbose=0, save_best_only=True, mode='auto'),
         TensorBoard(log_dir=summary_path, histogram_freq=0)
     ]
     model.fit(X_train, y_train, \
@@ -136,5 +153,8 @@ for train_index, valid_index in LabelShuffleSplit(driver_indices, n_iter=MAX_FOL
 score_geom = calc_geom(scores_total, MAX_FOLDS)
 predictions_geom = calc_geom_arr(predictions_total, MAX_FOLDS)
 
+print('Writing submission for {} folds, score: {}...'.format(num_folds, score_geom))
 submission_path = os.path.join(SUMMARY_PATH, 'submission_{}_{:.2}.csv'.format(int(time.time()), score_geom))
 write_submission(predictions_geom, X_test_ids, submission_path)
+
+print('Done.')
