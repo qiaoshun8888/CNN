@@ -63,7 +63,11 @@ class Model:
             tf.scalar_summary('accuracy_ema', accuracy_ema.average(self.accuracy_op))
 
         with tf.control_dependencies([global_step_op, accuracy_ema_op, loss_ema_op]):
-            self.train_op = tf.train.AdamOptimizer(LEARNING_RATE).minimize(self.loss_op, name='train')
+            # self.train_op = tf.train.AdamOptimizer(LEARNING_RATE).minimize(self.loss_op, name='train')
+            self.train_op = tf.train.MomentumOptimizer(LEARNING_RATE, 0.9).minimize(self.loss_op, name='train')
+            # self.train_op = tf.train.AdadeltaOptimizer(learning_rate=LEARNING_RATE, rho=0.95, epsilon=1e-08).minimize(self.loss_op, name='train')
+            # self.train_op = tf.train.RMSPropOptimizer(learning_rate=LEARNING_RATE, decay=1e-06).minimize(self.loss_op, name='train')
+            
 
         self.summaries_op = tf.merge_all_summaries()
 

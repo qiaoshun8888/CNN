@@ -24,7 +24,7 @@ SUMMARY_PATH = os.environ.get('SUMMARY_PATH', 'summaries/')
 
 NUM_EPOCHS = 50 if not FLAGS.test else 2
 MAX_FOLDS = 8
-BATCH_SIZE = 256
+BATCH_SIZE = 128
 
 print('Loading dataset {}...'.format(DATASET_PATH))
 with open(DATASET_PATH, 'rb') as f:
