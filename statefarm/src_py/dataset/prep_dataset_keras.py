@@ -37,13 +37,6 @@ def load_image(path):
 
 
 def normalize(img):
-    train_data = train_data.astype('float32')
-    test_data = test_data.astype('float32')
-    mean_pixel = [103.939, 116.779, 123.68]
-    for c in range(3):
-        train_data[:, c, :, :] = train_data[:, c, :, :] - mean_pixel[c]
-        test_data[:, c, :, :] = test_data[:, c, :, :] - mean_pixel[c]
-
     mean_pixel = [103.939, 116.799, 123.68]
     img = img.astype(np.float32, copy=False)
     for c in range(3):
