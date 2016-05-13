@@ -32,7 +32,26 @@ def load_image(path):
         img = cv2.imread(path)
     # Reduce size
     img = cv2.resize(img, (WIDTH, HEIGHT))
+    img = normalize(img)
     return img
+
+
+def normalize(img):
+    train_data = train_data.astype('float32')
+    test_data = test_data.astype('float32')
+    mean_pixel = [103.939, 116.779, 123.68]
+    for c in range(3):
+        train_data[:, c, :, :] = train_data[:, c, :, :] - mean_pixel[c]
+        test_data[:, c, :, :] = test_data[:, c, :, :] - mean_pixel[c]
+
+    mean_pixel = [103.939, 116.799, 123.68]
+    img = img.astype(np.float32, copy=False)
+    for c in range(3):
+       img[:, :, c] = img[:, :, c] - mean_pixel[c]
+    img = img.transpose((2, 0, 1))
+    img = np.expand_dims(img, axis=0)
+    return img
+
 
 def get_driver_data():
     drivers = dict()

@@ -122,13 +122,6 @@ def read_and_normalize_and_shuffle_train_data(path):
         test_data = test_data.transpose((0, 3, 1, 2))
 
     train_target = np_utils.to_categorical(train_target, 10)
-    train_data = train_data.astype('float32')
-    test_data = test_data.astype('float32')
-    mean_pixel = [103.939, 116.779, 123.68]
-    for c in range(3):
-        train_data[:, c, :, :] = train_data[:, c, :, :] - mean_pixel[c]
-        test_data[:, c, :, :] = test_data[:, c, :, :] - mean_pixel[c]
-    # train_data /= 255
     perm = permutation(len(train_target))
     train_data = train_data[perm]
     train_target = train_target[perm]
@@ -208,6 +201,7 @@ def main():
     run_cross_validation()
 
 
+main()
 
 
 
