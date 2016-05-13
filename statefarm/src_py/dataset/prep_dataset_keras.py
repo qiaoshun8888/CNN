@@ -7,6 +7,7 @@ import pickle
 import random
 import time
 import cv2
+import math
 import numpy as np
 import pandas as pd
 
@@ -17,10 +18,11 @@ from skimage.io import imread, imsave
 from scipy.misc import imresize
 
 SUBSET = False
-DOWNSAMPLE = 10
+DOWNSAMPLE = 224
 NUM_CLASSES = 10
 
-WIDTH, HEIGHT, NB_CHANNELS = 640 // DOWNSAMPLE, 480 // DOWNSAMPLE, 3
+# WIDTH, HEIGHT, NB_CHANNELS = 640 // DOWNSAMPLE, 480 // DOWNSAMPLE, 3
+WIDTH, HEIGHT, NB_CHANNELS = 224, 224, 3
 
 def load_image(path):
     # Load as grayscale
@@ -82,15 +84,15 @@ def load_train(base):
 
 def load_test(base):
     print('Read test images')
-    path = glob.glob(os.path.join(base, '*.jpg'))
+    path = os.path.join(base, '*.jpg')
     files = glob.glob(path)
     X_test = []
     X_test_id = []
     total = 0
-    thr = math.floor(len(files)/10)
-    for fl in files:
-        flbase = os.path.basename(fl)
-        img = get_im(fl, img_rows, img_cols, color_type)
+    thr = math.floor(len(files)/NUM_CLASSES)
+    for file in files:
+        flbase = os.path.basename(file)
+        img = load_image(file)
         X_test.append(img)
         X_test_id.append(flbase)
         total += 1

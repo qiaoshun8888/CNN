@@ -12,6 +12,7 @@ from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from keras.layers.core import Dense, Activation, Flatten, Dropout
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.layers.normalization import BatchNormalization
+from keras.utils import np_utils
 
 from sklearn.metrics import log_loss
 from sklearn.cross_validation import LabelShuffleSplit
@@ -21,7 +22,7 @@ from utilities import write_submission, calc_geom, calc_geom_arr, mkdirp
 TESTING = False
 USING_CHECKPOINT = False
 
-DOWNSAMPLE = 20
+DOWNSAMPLE = 224
 NB_EPOCHS = 50 if not TESTING else 10
 MAX_FOLDS = 8 if not TESTING else 2
 
@@ -35,12 +36,11 @@ mkdirp(CHECKPOINT_PATH)
 mkdirp(SUMMARY_PATH)
 mkdirp(MODEL_PATH)
 
-WIDTH, HEIGHT, NB_CHANNELS = 640 // DOWNSAMPLE, 480 // DOWNSAMPLE, 3
+# WIDTH, HEIGHT, NB_CHANNELS = 640 // DOWNSAMPLE, 480 // DOWNSAMPLE, 3
+WIDTH, HEIGHT, NB_CHANNELS = 224, 224, 3
+NUM_CLASSES = 10
 BATCH_SIZE = 64
-
-with open(DATASET_PATH, 'rb') as f:
-    X_train_raw, y_train_raw, X_test, X_test_ids, driver_ids = pickle.load(f)
-_, driver_indices = np.unique(np.array(driver_ids), return_inverse=True)
+PATIENCE = 5
 
 predictions_total = [] # accumulated predictions from each fold
 scores_total = [] # accumulated scores from each fold
@@ -105,61 +105,112 @@ def vgg_bn():
     return model
 
 
-for train_index, valid_index in LabelShuffleSplit(driver_indices, n_iter=MAX_FOLDS, test_size=0.2, random_state=67):
-    print('Fold {}/{}'.format(num_folds + 1, MAX_FOLDS))
+def read_and_normalize_and_shuffle_train_data(path):
+    with open(path, 'rb') as f:
+        X_train_raw, y_train_raw, X_test, X_test_ids, driver_ids = pickle.load(f)
+    _, driver_indices = np.unique(np.array(driver_ids), return_inverse=True)
 
-    # skip fold if a checkpoint exists for the next one
-    # next_checkpoint_path = os.path.join(CHECKPOINT_PATH, 'model_{}.h5'.format(num_folds + 1))
-    # if os.path.exists(next_checkpoint_path):
-    #     print('Checkpoint exists for next fold, skipping current fold.')
-    #     continue
+    train_data = np.array(X_train_raw, dtype=np.uint8)
+    train_target = np.array(y_train_raw, dtype=np.uint8)
+    test_data = np.array(X_test, dtype=np.uint8)
 
-    X_train, y_train = X_train_raw[train_index,...], y_train_raw[train_index,...]
-    X_valid, y_valid = X_train_raw[valid_index,...], y_train_raw[valid_index,...]
+    if NB_CHANNELS == 1:
+        train_data = train_data.reshape(train_data.shape[0], NB_CHANNELS, HEIGHT, WIDTH)
+        test_data = test_data.reshape(test_data.shape[0], NB_CHANNELS, HEIGHT, WIDTH)
+    else:
+        train_data = train_data.transpose((0, 3, 1, 2))
+        test_data = test_data.transpose((0, 3, 1, 2))
 
-    model = vgg_bn()
+    train_target = np_utils.to_categorical(train_target, 10)
+    train_data = train_data.astype('float32')
+    test_data = test_data.astype('float32')
+    mean_pixel = [103.939, 116.779, 123.68]
+    for c in range(3):
+        train_data[:, c, :, :] = train_data[:, c, :, :] - mean_pixel[c]
+        test_data[:, c, :, :] = test_data[:, c, :, :] - mean_pixel[c]
+    # train_data /= 255
+    perm = permutation(len(train_target))
+    train_data = train_data[perm]
+    train_target = train_target[perm]
+    print('Train shape:', train_data.shape)
+    print(train_data.shape[0], 'train samples')
+    print('Test shape:', test_data.shape)
+    print(test_data.shape[0], 'test samples')
+    return train_data, train_target, driver_ids, unique_drivers, driver_indices, test_data, X_test_ids
 
-    model_path = os.path.join(MODEL_PATH, 'model_{}.json'.format(num_folds))
-    with open(model_path, 'w') as f:
-        f.write(model.to_json())
+def run_cross_validation():
+    train_data, train_target, driver_ids, unique_drivers, driver_indices, test_data, X_test_ids = read_and_normalize_and_shuffle_train_data(DATASET_PATH)
 
-    # restore existing checkpoint, if it exists
-    checkpoint_path = os.path.join(CHECKPOINT_PATH, 'model_{}.h5'.format(num_folds))
-    if USING_CHECKPOINT and os.path.exists(checkpoint_path):
-        print('Restoring fold from checkpoint.')
-        model.load_weights(checkpoint_path)
+    for train_index, valid_index in LabelShuffleSplit(driver_indices, n_iter=MAX_FOLDS, test_size=0.2, random_state=67):
+        print('Fold {}/{}'.format(num_folds + 1, MAX_FOLDS))
 
-    summary_path = os.path.join(SUMMARY_PATH, 'model_{}'.format(num_folds))
-    mkdirp(summary_path)
+        # skip fold if a checkpoint exists for the next one
+        # next_checkpoint_path = os.path.join(CHECKPOINT_PATH, 'model_{}.h5'.format(num_folds + 1))
+        # if os.path.exists(next_checkpoint_path):
+        #     print('Checkpoint exists for next fold, skipping current fold.')
+        #     continue
 
-    callbacks = [
-        EarlyStopping(monitor='val_loss', patience=2, verbose=1, mode='auto'),
-        ModelCheckpoint(checkpoint_path, monitor='val_loss', verbose=0, save_best_only=True, mode='auto'),
-        # TensorBoard(log_dir=summary_path, histogram_freq=0)
-    ]
-    model.fit(X_train, y_train, \
-            batch_size=BATCH_SIZE, nb_epoch=NB_EPOCHS, \
-            shuffle=True, \
-            verbose=1, \
-            validation_data=(X_valid, y_valid), \
-            callbacks=callbacks)
+        X_train, y_train = train_data[train_index,...], train_target[train_index,...]
+        X_valid, y_valid = train_data[valid_index,...], train_target[valid_index,...]
 
-    predictions_valid = model.predict(X_valid, batch_size=BATCH_SIZE * 2, verbose=1)
-    score_valid = log_loss(y_valid, predictions_valid)
-    scores_total.append(score_valid)
+        model = vgg_bn()
 
-    print('Score: {}'.format(score_valid))
+        model_path = os.path.join(MODEL_PATH, 'model_{}.json'.format(num_folds))
+        with open(model_path, 'w') as f:
+            f.write(model.to_json())
 
-    predictions_test = model.predict(X_test, batch_size=BATCH_SIZE * 2, verbose=1)
-    predictions_total.append(predictions_test)
+        # restore existing checkpoint, if it exists
+        checkpoint_path = os.path.join(CHECKPOINT_PATH, 'model_{}.h5'.format(num_folds))
+        if USING_CHECKPOINT and os.path.exists(checkpoint_path):
+            print('Restoring fold from checkpoint.')
+            model.load_weights(checkpoint_path)
 
-    num_folds += 1
+        summary_path = os.path.join(SUMMARY_PATH, 'model_{}'.format(num_folds))
+        mkdirp(summary_path)
 
-score_geom = calc_geom(scores_total, MAX_FOLDS)
-predictions_geom = calc_geom_arr(predictions_total, MAX_FOLDS)
+        callbacks = [
+            EarlyStopping(monitor='val_loss', patience=PATIENCE, verbose=1, mode='auto'),
+            ModelCheckpoint(checkpoint_path, monitor='val_loss', verbose=0, save_best_only=True, mode='auto'),
+            # TensorBoard(log_dir=summary_path, histogram_freq=0)
+        ]
+        model.fit(
+            X_train, y_train, 
+            batch_size=BATCH_SIZE, 
+            nb_epoch=NB_EPOCHS, 
+            shuffle=True, 
+            verbose=1, 
+            validation_data=(X_valid, y_valid), 
+            callbacks=callbacks
+        )
 
-print('Writing submission for {} folds, score: {}...'.format(num_folds, score_geom))
-submission_path = os.path.join(SUMMARY_PATH, 'submission_{}_{:.2}.csv'.format(int(time.time()), score_geom))
-write_submission(predictions_geom, X_test_ids, submission_path)
+        predictions_valid = model.predict(X_valid, batch_size=BATCH_SIZE * 2, verbose=1)
+        score_valid = log_loss(y_valid, predictions_valid)
+        scores_total.append(score_valid)
 
-print('Done.')
+        print('Score: {}'.format(score_valid))
+
+        predictions_test = model.predict(test_data, batch_size=BATCH_SIZE * 2, verbose=1)
+        predictions_total.append(predictions_test)
+
+        num_folds += 1
+
+    score_geom = calc_geom(scores_total, MAX_FOLDS)
+    predictions_geom = calc_geom_arr(predictions_total, MAX_FOLDS)
+
+    print('Writing submission for {} folds, score: {}...'.format(num_folds, score_geom))
+    submission_path = os.path.join(SUMMARY_PATH, 'submission_{}_{:.2}.csv'.format(int(time.time()), score_geom))
+    write_submission(predictions_geom, X_test_ids, submission_path)
+
+    print('Done.')
+
+
+def main():
+    run_cross_validation()
+
+
+
+
+
+
+
+
