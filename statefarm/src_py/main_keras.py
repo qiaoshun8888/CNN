@@ -68,14 +68,16 @@ def vgg_bn():
 
     model.add(Flatten())
 
-    # model.add(Dense(128, activation='sigmoid', init='he_normal'))
+    # model.add(Dense(1024))
     # model.add(Activation('relu'))
     # model.add(Dropout(0.5))
 
     model.add(Dense(10))
     model.add(Activation('softmax'))
 
-    model.compile(Adam(lr=1e-3), loss='categorical_crossentropy', metrics=['accuracy'])
+    model.load_weights('models/model_weights.h5')
+
+    model.compile(Adam(lr=1e-4), loss='categorical_crossentropy', metrics=['accuracy'])
     # sgd = SGD(lr=5e-3, decay=1e-6, momentum=0.9, nesterov=True)
     # model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
 
