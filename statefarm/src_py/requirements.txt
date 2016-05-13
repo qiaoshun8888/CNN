@@ -5,3 +5,4 @@ tqdm
 scikit-image		
 keras
 h5py
+python-opencv

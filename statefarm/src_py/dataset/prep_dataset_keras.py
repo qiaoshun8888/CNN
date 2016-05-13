@@ -5,6 +5,8 @@ import os
 import glob
 import pickle
 import random
+import time
+import cv2
 import numpy as np
 import pandas as pd
 
@@ -14,78 +16,91 @@ from sklearn.preprocessing import OneHotEncoder
 from skimage.io import imread, imsave
 from scipy.misc import imresize
 
-SUBSET = True
+SUBSET = False
 DOWNSAMPLE = 10
 NUM_CLASSES = 10
 
-WIDTH, HEIGHT = 640 // DOWNSAMPLE, 480 // DOWNSAMPLE
+WIDTH, HEIGHT, NB_CHANNELS = 640 // DOWNSAMPLE, 480 // DOWNSAMPLE, 3
 
 def load_image(path):
-    img = imread(path)
-    img = imresize(img, (HEIGHT, WIDTH))
+    # Load as grayscale
+    if NB_CHANNELS == 1:
+        img = cv2.imread(path, 0)
+    elif NB_CHANNELS == 3:
+        img = cv2.imread(path)
+    # Reduce size
+    img = cv2.resize(img, (WIDTH, HEIGHT))
     return img
 
-def load_train(base):
-    driver_imgs_list = pd.read_csv('driver_imgs_list.csv')
-    driver_imgs_grouped = driver_imgs_list.groupby('classname')
+def get_driver_data():
+    drivers = dict()
+    classes = dict()
+    print('Read drivers data')
+    f = open('driver_imgs_list.csv', 'r')
+    line = f.readline()
+    while (1):
+        line = f.readline()
+        if line == '':
+            break
+        array = line.strip().split(',')
+        drivers[array[2]] = array[0]
+        if array[0] not in classes.keys():
+            classes[array[0]] = [(array[1], array[2])]
+        else:
+            classes[array[0]].append((array[1], array[2]))
+    f.close()
+    return drivers, classes
 
+def load_train(base):
     X_train = []
+    X_train_id = []
     y_train = []
     driver_ids = []
+    driver_data, driver_class = get_driver_data()
+    start_time = time.time()
 
     print('Reading train images...')
     for j in range(NUM_CLASSES):
         print('Loading folder c{}...'.format(j))
-        driver_ids_group = driver_imgs_grouped.get_group('c{}'.format(j))
-        paths = os.path.join(base, 'c{}/'.format(j)) + driver_ids_group.img
-
-        if SUBSET:
-            paths = paths[:100]
-            driver_ids_group = driver_ids_group.iloc[:100]
-
-        driver_ids += driver_ids_group['subject'].tolist()
-
-        for i, path in tqdm(enumerate(paths), total=len(paths)):
-            img = load_image(path)
-            if i == 0:
-                imsave('c{}.jpg'.format(j), img)
-            img = img.swapaxes(2, 0)
-
+        path = os.path.join(base, 'c{}/'.format(j), '*.jpg')
+        files = glob.glob(path)
+        for file in files:
+            flbase = os.path.basename(file)
+            img = load_image(file)
+            # img = get_im_cv2_mod(fl, img_rows, img_cols, color_type)
             X_train.append(img)
+            X_train_id.append(flbase)
             y_train.append(j)
+            driver_ids.append(driver_data[flbase])
 
-    X_train = np.array(X_train)
-    y_train = np.array(y_train)
+    print('Read train data time: {} seconds'.format(round(time.time() - start_time, 2)))
+    unique_drivers = sorted(list(set(driver_ids)))
+    print('Unique drivers: {}'.format(len(unique_drivers)))
+    print(unique_drivers)
+    return X_train, y_train, X_train_id, driver_ids, unique_drivers
 
-    y_train = OneHotEncoder(n_values=NUM_CLASSES) \
-        .fit_transform(y_train.reshape(-1, 1)) \
-        .toarray()
-
-    return X_train, y_train, driver_ids
 
 def load_test(base):
+    print('Read test images')
+    path = glob.glob(os.path.join(base, '*.jpg'))
+    files = glob.glob(path)
     X_test = []
     X_test_id = []
-    paths = glob.glob(os.path.join(base, '*.jpg'))
-
-    if SUBSET:
-        paths = paths[:100]
-
-    print('Reading test images...')
-    for i, path in tqdm(enumerate(paths), total=len(paths)):
-        img_id = os.path.basename(path)
-        img = load_image(path)
-        img = img.swapaxes(2, 0)
-
+    total = 0
+    thr = math.floor(len(files)/10)
+    for fl in files:
+        flbase = os.path.basename(fl)
+        img = get_im(fl, img_rows, img_cols, color_type)
         X_test.append(img)
-        X_test_id.append(img_id)
-
-    X_test = np.array(X_test)
-    X_test_id = np.array(X_test_id)
+        X_test_id.append(flbase)
+        total += 1
+        if total % thr == 0:
+            print('Read {} images from {}'.format(total, len(files)))
 
     return X_test, X_test_id
 
-X_train, y_train, driver_ids = load_train('imgs/train/')
+
+X_train, y_train, X_train_id, driver_ids, unique_drivers = load_train('imgs/train/')
 X_test, X_test_ids = load_test('imgs/test/')
 
 if SUBSET:
