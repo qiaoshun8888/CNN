@@ -18,7 +18,8 @@ from sklearn.cross_validation import LabelShuffleSplit
 
 from utilities import write_submission, calc_geom, calc_geom_arr, mkdirp
 
-TESTING = True
+TESTING = False
+USING_CHECKPOINT = False
 
 DOWNSAMPLE = 20
 NB_EPOCHS = 50 if not TESTING else 10
@@ -50,53 +51,33 @@ def vgg_bn():
     model.add(Convolution2D(32, 3, 3, border_mode='same', init='he_normal', input_shape=(NB_CHANNELS, WIDTH, HEIGHT)))
     model.add(BatchNormalization())
     model.add(Activation('relu'))
-    # model.add(Convolution2D(32, 3, 3, border_mode='same', init='he_normal'))
-    # model.add(BatchNormalization())
-    # model.add(Activation('relu'))
+    model.add(Dropout(0.5))
 
     model.add(Convolution2D(64, 3, 3, border_mode='same', init='he_normal'))
     model.add(BatchNormalization())
     model.add(Activation('relu'))
-    # model.add(Convolution2D(64, 3, 3, border_mode='same', init='he_normal'))
-    # model.add(BatchNormalization())
-    # model.add(Activation('relu'))
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+    model.add(Dropout(0.5))
 
     # model.add(Convolution2D(128, 2, 2, subsample=(2, 2), init='he_normal'))
     model.add(Convolution2D(128, 3, 3, border_mode='same', init='he_normal'))
     model.add(BatchNormalization())
     model.add(Activation('relu'))
-    # model.add(Convolution2D(128, 3, 3, border_mode='same', init='he_normal'))
-    # model.add(BatchNormalization())
-    # model.add(Activation('relu'))
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-    # model.add(Convolution2D(256, 3, 3, border_mode='same', init='he_normal'))
-    # model.add(BatchNormalization())
-    # model.add(Activation('relu'))
-    # model.add(Convolution2D(256, 3, 3, border_mode='same', init='he_normal'))
-    # model.add(BatchNormalization())
-    # model.add(Activation('relu'))
-    # model.add(Convolution2D(256, 3, 3, border_mode='same', init='he_normal'))
-    # model.add(BatchNormalization())
-    # model.add(Activation('relu'))
-    # model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+    model.add(Dropout(0.5))
 
     model.add(Flatten())
 
-    model.add(Dense(128, activation='sigmoid', init='he_normal'))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.5))
+    # model.add(Dense(128, activation='sigmoid', init='he_normal'))
+    # model.add(Activation('relu'))
+    # model.add(Dropout(0.5))
 
-    model.add(Dense(128, activation='sigmoid', init='he_normal'))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.5))
+    model.add(Dense(10))
+    model.add(Activation('softmax'))
 
-    model.add(Dense(10, activation='softmax', init='he_normal'))
-
-    # model.compile(Adam(lr=1e-3), loss='categorical_crossentropy', metrics=['accuracy'])
-    sgd = SGD(lr=5e-3, decay=1e-6, momentum=0.9, nesterov=True)
-    model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(Adam(lr=1e-3), loss='categorical_crossentropy', metrics=['accuracy'])
+    # sgd = SGD(lr=5e-3, decay=1e-6, momentum=0.9, nesterov=True)
+    # model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
 
     return model
 
@@ -120,7 +101,7 @@ for train_index, valid_index in LabelShuffleSplit(driver_indices, n_iter=MAX_FOL
 
     # restore existing checkpoint, if it exists
     checkpoint_path = os.path.join(CHECKPOINT_PATH, 'model_{}.h5'.format(num_folds))
-    if os.path.exists(checkpoint_path):
+    if USING_CHECKPOINT and os.path.exists(checkpoint_path):
         print('Restoring fold from checkpoint.')
         model.load_weights(checkpoint_path)
 
@@ -130,7 +111,7 @@ for train_index, valid_index in LabelShuffleSplit(driver_indices, n_iter=MAX_FOL
     callbacks = [
         EarlyStopping(monitor='val_loss', patience=2, verbose=1, mode='auto'),
         ModelCheckpoint(checkpoint_path, monitor='val_loss', verbose=0, save_best_only=True, mode='auto'),
-        TensorBoard(log_dir=summary_path, histogram_freq=0)
+        # TensorBoard(log_dir=summary_path, histogram_freq=0)
     ]
     model.fit(X_train, y_train, \
             batch_size=BATCH_SIZE, nb_epoch=NB_EPOCHS, \

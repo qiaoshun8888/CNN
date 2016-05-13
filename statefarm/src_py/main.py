@@ -22,9 +22,10 @@ DATASET_PATH = os.environ.get('DATASET_PATH', 'dataset/data_20_tf.pkl' if not FL
 CHECKPOINT_PATH = os.environ.get('CHECKPOINT_PATH', 'checkpoints/')
 SUMMARY_PATH = os.environ.get('SUMMARY_PATH', 'summaries/')
 
-NUM_EPOCHS = 50 if not FLAGS.test else 2
-MAX_FOLDS = 8
+NUM_EPOCHS = 50 if not FLAGS.test else 20
+MAX_FOLDS = 8 if not FLAGS.test else 2
 BATCH_SIZE = 128
+PATIENCE = 3
 
 print('Loading dataset {}...'.format(DATASET_PATH))
 with open(DATASET_PATH, 'rb') as f:
@@ -46,7 +47,7 @@ for train_index, valid_index in LabelShuffleSplit(driver_indices, n_iter=MAX_FOL
         layers = vgg_bn()
         model = Model(layers, num_folds, batch_size=BATCH_SIZE)
 
-        patience = 2
+        patience = PATIENCE
         wait = 0
         best = np.Inf
 
@@ -67,7 +68,7 @@ for train_index, valid_index in LabelShuffleSplit(driver_indices, n_iter=MAX_FOL
                 wait += 1
                 print('Validation loss did not improve for {}/{} epochs.'.format(wait, patience))
 
-            if wait == 2:
+            if wait == patience:
                 print('Stopping early. Validation loss did not improve for {}/{} epochs.'.format(wait, patience))
                 break
 

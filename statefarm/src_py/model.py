@@ -17,7 +17,7 @@ DOWNSAMPLE = 20
 WIDTH, HEIGHT, NUM_CHANNELS = 640 // DOWNSAMPLE, 480 // DOWNSAMPLE, 3
 NUM_CLASSES = 10
 
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 5e-3
 
 class Model:
     def __init__(self, layers, fold_index, batch_size):
@@ -64,8 +64,9 @@ class Model:
 
         with tf.control_dependencies([global_step_op, accuracy_ema_op, loss_ema_op]):
             # self.train_op = tf.train.AdamOptimizer(LEARNING_RATE).minimize(self.loss_op, name='train')
-            self.train_op = tf.train.MomentumOptimizer(LEARNING_RATE, 0.9).minimize(self.loss_op, name='train')
+            # self.train_op = tf.train.MomentumOptimizer(LEARNING_RATE, 0.9).minimize(self.loss_op, name='train')
             # self.train_op = tf.train.AdadeltaOptimizer(learning_rate=LEARNING_RATE, rho=0.95, epsilon=1e-08).minimize(self.loss_op, name='train')
+            self.train_op = tf.train.AdagradOptimizer(learning_rate=LEARNING_RATE, initial_accumulator_value=0.1).minimize(self.loss_op, name='train')
             # self.train_op = tf.train.RMSPropOptimizer(learning_rate=LEARNING_RATE, decay=1e-06).minimize(self.loss_op, name='train')
             
 
