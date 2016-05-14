@@ -116,8 +116,10 @@ def read_data(path, using_cache=False):
             X_train_raw, y_train_raw, X_test, X_test_ids, driver_ids = pickle.load(f)
         _, driver_indices = np.unique(np.array(driver_ids), return_inverse=True)
     else:
-        X_train_raw, y_train_raw, _, driver_ids, unique_drivers = load_train('dataset/imgs/train/')  ## _: X_train_id
-        X_test, X_test_ids = load_test('dataset/imgs/test/')
+        X_train_raw, y_train_raw, _, driver_ids, unique_drivers = load_train(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dataset/imgs/train/'))  ## _: X_train_id
+        X_test, X_test_ids = load_test(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dataset/imgs/test/'))
 
     train_data = np.array(X_train_raw, dtype=np.uint8)
     train_target = np.array(y_train_raw, dtype=np.uint8)
