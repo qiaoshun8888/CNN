@@ -46,11 +46,11 @@ def normalize(img):
     return img
 
 
-def get_driver_data():
+def get_driver_data(base):
     drivers = dict()
     classes = dict()
     print('Read drivers data')
-    f = open('driver_imgs_list.csv', 'r')
+    f = open(os.path.join(base, 'driver_imgs_list.csv'), 'r')
     line = f.readline()
     while (1):
         line = f.readline()
@@ -70,7 +70,7 @@ def load_train(base):
     X_train_id = []
     y_train = []
     driver_ids = []
-    driver_data, driver_class = get_driver_data()
+    driver_data, driver_class = get_driver_data(base)
     start_time = time.time()
 
     print('Reading train images...')

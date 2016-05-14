@@ -4,6 +4,7 @@ from __future__ import division
 import os
 import time
 import pickle
+import sys
 import numpy as np
 
 from keras.models import Sequential
@@ -18,6 +19,10 @@ from sklearn.metrics import log_loss
 from sklearn.cross_validation import LabelShuffleSplit
 
 from utilities import write_submission, calc_geom, calc_geom_arr, mkdirp
+
+
+sys.path.insert(0, '/Users/sqiao/Desktop/kaggle/statefarm/src_py/dataset')
+from prep_dataset_keras import load_train, load_test
 
 TESTING = False
 USING_CHECKPOINT = False
@@ -105,10 +110,14 @@ def vgg_bn():
     return model
 
 
-def read_and_normalize_and_shuffle_train_data(path):
-    with open(path, 'rb') as f:
-        X_train_raw, y_train_raw, X_test, X_test_ids, driver_ids = pickle.load(f)
-    _, driver_indices = np.unique(np.array(driver_ids), return_inverse=True)
+def read_data(path, using_cache=False):
+    if using_cache:
+        with open(path, 'rb') as f:
+            X_train_raw, y_train_raw, X_test, X_test_ids, driver_ids = pickle.load(f)
+        _, driver_indices = np.unique(np.array(driver_ids), return_inverse=True)
+    else:
+        X_train_raw, y_train_raw, _, driver_ids, unique_drivers = load_train('dataset/imgs/train/')  ## _: X_train_id
+        X_test, X_test_ids = load_test('dataset/imgs/test/')
 
     train_data = np.array(X_train_raw, dtype=np.uint8)
     train_target = np.array(y_train_raw, dtype=np.uint8)
@@ -132,7 +141,7 @@ def read_and_normalize_and_shuffle_train_data(path):
     return train_data, train_target, driver_ids, unique_drivers, driver_indices, test_data, X_test_ids
 
 def run_cross_validation():
-    train_data, train_target, driver_ids, unique_drivers, driver_indices, test_data, X_test_ids = read_and_normalize_and_shuffle_train_data(DATASET_PATH)
+    train_data, train_target, driver_ids, unique_drivers, driver_indices, test_data, X_test_ids = read_data(DATASET_PATH)
 
     for train_index, valid_index in LabelShuffleSplit(driver_indices, n_iter=MAX_FOLDS, test_size=0.2, random_state=67):
         print('Fold {}/{}'.format(num_folds + 1, MAX_FOLDS))
