@@ -203,7 +203,7 @@ def _load_test_worker(base, chunk_id, total_chunks, chunk, results):
         X_test_id.append(flbase)
 
     results[chunk_id] = (X_test, X_test_id)
-    print('Chunk {0} / {1}: tests {0} loaded.'.format(chunk_id, total_chunks, len(chunk)))
+    print('Chunk {0} / {1}: tests {2} loaded.'.format(chunk_id, total_chunks, len(chunk)))
 
 
 def vgg_bn():
@@ -407,4 +407,5 @@ def main():
     run_cross_validation()
 
 
-main()
+load_test('dataset/imgs/test/')
+
