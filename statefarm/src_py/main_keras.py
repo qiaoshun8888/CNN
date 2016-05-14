@@ -3,15 +3,21 @@ from __future__ import division
 
 import os
 import time
+import cv2
+import math
+import random
 import pickle
+import pandas as pd
+import glob
 import sys
 import numpy as np
+from numpy.random import permutation
 
 from keras.models import Sequential
 from keras.optimizers import Adam, SGD
 from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from keras.layers.core import Dense, Activation, Flatten, Dropout
-from keras.layers.convolutional import Convolution2D, MaxPooling2D
+from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.layers.normalization import BatchNormalization
 from keras.utils import np_utils
 
@@ -44,10 +50,6 @@ NUM_CLASSES = 10
 BATCH_SIZE = 64
 PATIENCE = 5
 
-predictions_total = [] # accumulated predictions from each fold
-scores_total = [] # accumulated scores from each fold
-num_folds = 0
-
 
 def load_image(path):
     # Load as grayscale
@@ -67,7 +69,7 @@ def normalize(img):
     for c in range(3):
        img[:, :, c] = img[:, :, c] - mean_pixel[c]
     img = img.transpose((2, 0, 1))
-    img = np.expand_dims(img, axis=0)
+    # img = np.expand_dims(img, axis=0)
     return img
 
 
@@ -128,7 +130,7 @@ def load_test(base):
     X_test_id = []
     total = 0
     thr = math.floor(len(files)/NUM_CLASSES)
-    for file in files:
+    for i, file in enumerate(files):
         flbase = os.path.basename(file)
         img = load_image(file)
         X_test.append(img)
@@ -141,8 +143,7 @@ def load_test(base):
 
 def vgg_bn():
     model = Sequential()
-    model.add(ZeroPadding2D((1, 1), input_shape=(color_type,
-                                                 img_rows, img_cols)))
+    model.add(ZeroPadding2D((1, 1), input_shape=(NB_CHANNELS, HEIGHT, WIDTH)))
     model.add(Convolution2D(64, 3, 3, activation='relu'))
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(64, 3, 3, activation='relu'))
@@ -187,7 +188,6 @@ def vgg_bn():
 
     model.load_weights('models/vgg16_weights.h5')
 
-
     # Code above loads pre-trained data and
     model.layers.pop()
     model.add(Dense(10, activation='softmax'))
@@ -206,6 +206,7 @@ def read_data(path, using_cache=False):
     else:
         X_train_raw, y_train_raw, _, driver_ids, unique_drivers = load_train('dataset/imgs/train/')  ## _: X_train_id
         X_test, X_test_ids = load_test('dataset/imgs/test/')
+        _, driver_indices = np.unique(np.array(driver_ids), return_inverse=True)
 
     train_data = np.array(X_train_raw, dtype=np.uint8)
     train_target = np.array(y_train_raw, dtype=np.uint8)
@@ -215,13 +216,16 @@ def read_data(path, using_cache=False):
         train_data = train_data.reshape(train_data.shape[0], NB_CHANNELS, HEIGHT, WIDTH)
         test_data = test_data.reshape(test_data.shape[0], NB_CHANNELS, HEIGHT, WIDTH)
     else:
-        train_data = train_data.transpose((0, 3, 1, 2))
-        test_data = test_data.transpose((0, 3, 1, 2))
+        # train_data = train_data[1]
+        # test_data = test_data[1]
+        # train_data = train_data.transpose((0, 3, 1, 2))
+        # test_data = test_data.transpose((0, 3, 1, 2))
+        pass
 
     train_target = np_utils.to_categorical(train_target, 10)
-    perm = permutation(len(train_target))
-    train_data = train_data[perm]
-    train_target = train_target[perm]
+    # perm = permutation(len(train_target))
+    # train_data = train_data[perm]
+    # train_target = train_target[perm]
     print('Train shape:', train_data.shape)
     print(train_data.shape[0], 'train samples')
     print('Test shape:', test_data.shape)
@@ -230,6 +234,10 @@ def read_data(path, using_cache=False):
 
 
 def run_cross_validation():
+    predictions_total = [] # accumulated predictions from each fold
+    scores_total = [] # accumulated scores from each fold
+    num_folds = 0
+
     train_data, train_target, driver_ids, unique_drivers, driver_indices, test_data, X_test_ids = read_data(DATASET_PATH)
 
     for train_index, valid_index in LabelShuffleSplit(driver_indices, n_iter=MAX_FOLDS, test_size=0.2, random_state=67):
