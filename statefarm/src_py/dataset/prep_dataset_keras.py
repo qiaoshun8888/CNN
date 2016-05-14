@@ -50,7 +50,7 @@ def get_driver_data(base):
     drivers = dict()
     classes = dict()
     print('Read drivers data')
-    f = open(os.path.join(base, 'driver_imgs_list.csv'), 'r')
+    f = open(os.path.join(base if base else 'dataset', 'driver_imgs_list.csv'), 'r')
     line = f.readline()
     while (1):
         line = f.readline()
