@@ -70,7 +70,8 @@ def load_train(base):
     X_train_id = []
     y_train = []
     driver_ids = []
-    driver_data, driver_class = get_driver_data(base)
+    driver_data_base = os.path.dirname(os.path.dirname(base))
+    driver_data, driver_class = get_driver_data(driver_data_base)
     start_time = time.time()
 
     print('Reading train images...')
