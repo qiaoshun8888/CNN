@@ -114,13 +114,16 @@ def load_test(base):
     return X_test, X_test_id
 
 
-X_train, y_train, X_train_id, driver_ids, unique_drivers = load_train('imgs/train/')
-X_test, X_test_ids = load_test('imgs/test/')
+def main():
+    X_train, y_train, X_train_id, driver_ids, unique_drivers = load_train('imgs/train/')
+    X_test, X_test_ids = load_test('imgs/test/')
 
-if SUBSET:
-    dest = 'data_{}_subset_keras.pkl'.format(DOWNSAMPLE)
-else:
-    dest = 'data_{}_keras.pkl'.format(DOWNSAMPLE)
+    if SUBSET:
+        dest = 'data_{}_subset_keras.pkl'.format(DOWNSAMPLE)
+    else:
+        dest = 'data_{}_keras.pkl'.format(DOWNSAMPLE)
 
-with open(dest, 'wb') as f:
-    pickle.dump((X_train, y_train, X_test, X_test_ids, driver_ids), f, protocol=2)
+    with open(dest, 'wb') as f:
+        pickle.dump((X_train, y_train, X_test, X_test_ids, driver_ids), f, protocol=2)
+
+# main()
