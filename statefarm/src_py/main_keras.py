@@ -31,8 +31,8 @@ TESTING = False
 USING_CHECKPOINT = False
 
 DOWNSAMPLE = 224
-NB_EPOCHS = 50 if not TESTING else 10
-MAX_FOLDS = 8 if not TESTING else 2
+NB_EPOCHS = 5 if not TESTING else 10
+MAX_FOLDS = 5 if not TESTING else 2
 
 DATASET_PATH = os.environ.get('DATASET_PATH', 'dataset/data_%d_keras.pkl' % DOWNSAMPLE if not TESTING else 'dataset/data_%d_subset_keras.pkl' % DOWNSAMPLE)
 
@@ -47,8 +47,8 @@ mkdirp(MODEL_PATH)
 # WIDTH, HEIGHT, NB_CHANNELS = 640 // DOWNSAMPLE, 480 // DOWNSAMPLE, 3
 WIDTH, HEIGHT, NB_CHANNELS = 224, 224, 3
 NUM_CLASSES = 10
-BATCH_SIZE = 64
-PATIENCE = 5
+BATCH_SIZE = 128
+PATIENCE = 3
 
 
 def load_image(path):
