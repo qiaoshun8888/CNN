@@ -26,7 +26,7 @@ from keras.utils import np_utils
 from sklearn.metrics import log_loss
 from sklearn.cross_validation import LabelShuffleSplit
 
-from utilities import write_submission, calc_geom, calc_geom_arr, mkdirp
+from utilities import write_submission, calc_geom, calc_geom_arr, mkdirp, chunks
 
 
 TESTING = False
@@ -52,6 +52,7 @@ WIDTH, HEIGHT, NB_CHANNELS = 28 if TESTING else 224, 28 if TESTING else 224, 3
 NUM_CLASSES = 10
 BATCH_SIZE = 128
 PATIENCE = 3
+TESTS_LOADING_CHUNK_SIZE = 2700  # 2700 test images per chunk. 79726 / 2700 ~= 30 (cores)
 
 
 def load_image(path):
@@ -152,7 +153,7 @@ def _load_train_worker(base, class_index, driver_data, results):
         driver_ids.append(driver_data[flbase])
 
     results[class_index] = (X_train, y_train, X_train_id, driver_ids)
-    print('Loading foler c{0}: {1} loaded.'.format(class_index, len(files)))
+    print('Foler c{0}: {1} loaded.'.format(class_index, len(files)))
 
 
 def load_test(base):
@@ -161,23 +162,51 @@ def load_test(base):
     files = glob.glob(path)
     X_test = []
     X_test_id = []
-    total = 0
-    thr = math.floor(len(files) / NUM_CLASSES)
-    for i, file in enumerate(files):
+    start_time = time.time()
+
+    manager = Manager()
+    results = manager.dict()
+    worker_processes = []
+    total_chunks = 0
+
+    for i, chunk in enumerate(chunks(files, TESTS_LOADING_CHUNK_SIZE)):
+        worker_processes.append(
+            Process(target=_load_test_worker, args=(base, i, chunk, results)))
+        total_chunks += 1
+
+    for j, p in enumerate(worker_processes):
+        print('Start worker process[%s] ...' % str(p))
+        p.start()
+
+    for p in worker_processes:
+        p.join()
+
+    for i in range(total_chunks):
+        sub_X_test, sub_X_test_id = results[i]
+        X_test.extend(sub_X_test)
+        X_test_id.extend(sub_X_test_id)
+
+    print('Read test data time: {} seconds'.format(
+        round(time.time() - start_time, 2)))
+    return X_test, X_test_id
+
+
+def _load_test_worker(base, chunk_id, chunk, results):
+    X_test = []
+    X_test_id = []
+
+    for file in chunk:
         flbase = os.path.basename(file)
         img = load_image(file)
         X_test.append(img)
         X_test_id.append(flbase)
-        total += 1
-        if total % thr == 0:
-            print('Read {} images from {}'.format(total, len(files)))
-            break
 
-    return X_test, X_test_id
+    results[chunk_id] = (X_test, X_test_id)
+    print('Tests {0} loaded.'.format(len(chunk)))
 
 
 def vgg_bn():
-    model = Sequential()
+    model=Sequential()
     model.add(ZeroPadding2D((1, 1), input_shape=(NB_CHANNELS, HEIGHT, WIDTH)))
     model.add(Convolution2D(64, 3, 3, activation='relu'))
     model.add(ZeroPadding2D((1, 1)))
@@ -214,17 +243,17 @@ def vgg_bn():
     model.add(Convolution2D(512, 3, 3, activation='relu'))
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-    weights_path = 'models/vgg16_weights.h5'
+    weights_path='models/vgg16_weights.h5'
     assert os.path.exists(
         weights_path), 'Model weights not found (see "weights_path" variable in script).'
-    f = h5py.File(weights_path)
+    f=h5py.File(weights_path)
     for k in range(f.attrs['nb_layers']):
         if k >= len(model.layers):
             # we don't look at the last (fully-connected) layers in the
             # savefile
             break
-        g = f['layer_{}'.format(k)]
-        weights = [g['param_{}'.format(p)]
+        g=f['layer_{}'.format(k)]
+        weights=[g['param_{}'.format(p)]
                    for p in range(g.attrs['nb_params'])]
         model.layers[k].set_weights(weights)
     f.close()
@@ -243,35 +272,36 @@ def vgg_bn():
     model.layers.pop()
     model.add(Dense(10, activation='softmax'))
     # Learning rate is changed to 0.001
-    sgd = SGD(lr=1e-3, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd=SGD(lr=1e-3, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(optimizer=sgd, loss='categorical_crossentropy',
                   metrics=['accuracy'])
-    # model.compile(Adam(lr=1e-4), loss='categorical_crossentropy', metrics=['accuracy'])
+    # model.compile(Adam(lr=1e-4), loss='categorical_crossentropy',
+    # metrics=['accuracy'])
     return model
 
 
 def read_data(path, using_cache=False):
     if using_cache:
         with open(path, 'rb') as f:
-            X_train_raw, y_train_raw, X_test, X_test_ids, driver_ids = pickle.load(
+            X_train_raw, y_train_raw, X_test, X_test_ids, driver_ids=pickle.load(
                 f)
-        _, driver_indices = np.unique(
+        _, driver_indices=np.unique(
             np.array(driver_ids), return_inverse=True)
     else:
-        X_train_raw, y_train_raw, _, driver_ids, unique_drivers = load_train(
+        X_train_raw, y_train_raw, _, driver_ids, unique_drivers=load_train(
             'dataset/imgs/train/')  # _: X_train_id
-        X_test, X_test_ids = load_test('dataset/imgs/test/')
-        _, driver_indices = np.unique(
+        X_test, X_test_ids=load_test('dataset/imgs/test/')
+        _, driver_indices=np.unique(
             np.array(driver_ids), return_inverse=True)
 
-    train_data = np.array(X_train_raw, dtype=np.uint8)
-    train_target = np.array(y_train_raw, dtype=np.uint8)
-    test_data = np.array(X_test, dtype=np.uint8)
+    train_data=np.array(X_train_raw, dtype=np.uint8)
+    train_target=np.array(y_train_raw, dtype=np.uint8)
+    test_data=np.array(X_test, dtype=np.uint8)
 
     if NB_CHANNELS == 1:
-        train_data = train_data.reshape(
+        train_data=train_data.reshape(
             train_data.shape[0], NB_CHANNELS, HEIGHT, WIDTH)
-        test_data = test_data.reshape(
+        test_data=test_data.reshape(
             test_data.shape[0], NB_CHANNELS, HEIGHT, WIDTH)
     else:
         # train_data = train_data[1]
@@ -280,7 +310,7 @@ def read_data(path, using_cache=False):
         # test_data = test_data.transpose((0, 3, 1, 2))
         pass
 
-    train_target = np_utils.to_categorical(train_target, 10)
+    train_target=np_utils.to_categorical(train_target, 10)
     # perm = permutation(len(train_target))
     # train_data = train_data[perm]
     # train_target = train_target[perm]
@@ -292,11 +322,11 @@ def read_data(path, using_cache=False):
 
 
 def run_cross_validation():
-    predictions_total = []  # accumulated predictions from each fold
-    scores_total = []  # accumulated scores from each fold
-    num_folds = 0
+    predictions_total=[]  # accumulated predictions from each fold
+    scores_total=[]  # accumulated scores from each fold
+    num_folds=0
 
-    train_data, train_target, driver_ids, unique_drivers, driver_indices, test_data, X_test_ids = read_data(
+    train_data, train_target, driver_ids, unique_drivers, driver_indices, test_data, X_test_ids=read_data(
         DATASET_PATH)
 
     for train_index, valid_index in LabelShuffleSplit(driver_indices, n_iter=MAX_FOLDS, test_size=0.2, random_state=67):
@@ -308,29 +338,29 @@ def run_cross_validation():
         #     print('Checkpoint exists for next fold, skipping current fold.')
         #     continue
 
-        X_train, y_train = train_data[
+        X_train, y_train=train_data[
             train_index, ...], train_target[train_index, ...]
-        X_valid, y_valid = train_data[
+        X_valid, y_valid=train_data[
             valid_index, ...], train_target[valid_index, ...]
 
-        model = vgg_bn()
+        model=vgg_bn()
 
-        model_path = os.path.join(
+        model_path=os.path.join(
             MODEL_PATH, 'model_{}.json'.format(num_folds))
         with open(model_path, 'w') as f:
             f.write(model.to_json())
 
         # restore existing checkpoint, if it exists
-        checkpoint_path = os.path.join(
+        checkpoint_path=os.path.join(
             CHECKPOINT_PATH, 'model_{}.h5'.format(num_folds))
         if USING_CHECKPOINT and os.path.exists(checkpoint_path):
             print('Restoring fold from checkpoint.')
             model.load_weights(checkpoint_path)
 
-        summary_path = os.path.join(SUMMARY_PATH, 'model_{}'.format(num_folds))
+        summary_path=os.path.join(SUMMARY_PATH, 'model_{}'.format(num_folds))
         mkdirp(summary_path)
 
-        callbacks = [
+        callbacks=[
             EarlyStopping(monitor='val_loss', patience=PATIENCE,
                           verbose=1, mode='auto'),
             ModelCheckpoint(checkpoint_path, monitor='val_loss',
@@ -347,25 +377,25 @@ def run_cross_validation():
             callbacks=callbacks
         )
 
-        predictions_valid = model.predict(
+        predictions_valid=model.predict(
             X_valid, batch_size=BATCH_SIZE * 2, verbose=1)
-        score_valid = log_loss(y_valid, predictions_valid)
+        score_valid=log_loss(y_valid, predictions_valid)
         scores_total.append(score_valid)
 
         print('Score: {}'.format(score_valid))
 
-        predictions_test = model.predict(
+        predictions_test=model.predict(
             test_data, batch_size=BATCH_SIZE * 2, verbose=1)
         predictions_total.append(predictions_test)
 
         num_folds += 1
 
-    score_geom = calc_geom(scores_total, MAX_FOLDS)
-    predictions_geom = calc_geom_arr(predictions_total, MAX_FOLDS)
+    score_geom=calc_geom(scores_total, MAX_FOLDS)
+    predictions_geom=calc_geom_arr(predictions_total, MAX_FOLDS)
 
     print('Writing submission for {} folds, score: {}...'.format(
         num_folds, score_geom))
-    submission_path = os.path.join(
+    submission_path=os.path.join(
         SUMMARY_PATH, 'submission_{}_{:.2}.csv'.format(int(time.time()), score_geom))
     write_submission(predictions_geom, X_test_ids, submission_path)
 
@@ -377,4 +407,4 @@ def main():
 
 
 # main()
-load_train('dataset/imgs/train/')
+load_test('dataset/imgs/test/')
