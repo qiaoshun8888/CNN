@@ -123,4 +123,4 @@ else:
     dest = 'data_{}_keras.pkl'.format(DOWNSAMPLE)
 
 with open(dest, 'wb') as f:
-    pickle.dump((X_train, y_train, X_test, X_test_ids, driver_ids), f)
+    pickle.dump((X_train, y_train, X_test, X_test_ids, driver_ids), f, protocol=2)
