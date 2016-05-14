@@ -52,7 +52,7 @@ WIDTH, HEIGHT, NB_CHANNELS = 28 if TESTING else 224, 28 if TESTING else 224, 3
 NUM_CLASSES = 10
 BATCH_SIZE = 128
 PATIENCE = 3
-TESTS_LOADING_CHUNK_SIZE = 2700  # 2700 test images per chunk. 79726 / 2700 ~= 30 (cores)
+TESTS_LOADING_CHUNK_SIZE = 3500  # 3500 test images per chunk. 79726 / 3500 ~= 23 (cores)
 
 
 def load_image(path):
@@ -167,12 +167,13 @@ def load_test(base):
     manager = Manager()
     results = manager.dict()
     worker_processes = []
-    total_chunks = 0
 
-    for i, chunk in enumerate(chunks(files, TESTS_LOADING_CHUNK_SIZE)):
+    chunk_list = list(chunks(files, TESTS_LOADING_CHUNK_SIZE))
+    total_chunks = len(chunk_list)
+
+    for i, chunk in enumerate(chunk_list):
         worker_processes.append(
-            Process(target=_load_test_worker, args=(base, i, chunk, results)))
-        total_chunks += 1
+            Process(target=_load_test_worker, args=(base, i, total_chunks, chunk, results)))
 
     for j, p in enumerate(worker_processes):
         print('Start worker process[%s] ...' % str(p))
@@ -191,7 +192,7 @@ def load_test(base):
     return X_test, X_test_id
 
 
-def _load_test_worker(base, chunk_id, chunk, results):
+def _load_test_worker(base, chunk_id, total_chunks, chunk, results):
     X_test = []
     X_test_id = []
 
@@ -202,7 +203,7 @@ def _load_test_worker(base, chunk_id, chunk, results):
         X_test_id.append(flbase)
 
     results[chunk_id] = (X_test, X_test_id)
-    print('Tests {0} loaded.'.format(len(chunk)))
+    print('Chunk {0} / {1}: tests {0} loaded.'.format(chunk_id, total_chunks, len(chunk)))
 
 
 def vgg_bn():
@@ -406,5 +407,4 @@ def main():
     run_cross_validation()
 
 
-# main()
-load_test('dataset/imgs/test/')
+main()
